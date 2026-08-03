@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>再续天庭 · 存档全能编辑器 </title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2332;
+  --bg-hover: #243447;
+  --border-color: #2d3a4f;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-glow: rgba(79,70,229,0.3);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+.app-container { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 250px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-header { padding: 24px; border-bottom: 1px solid var(--border-color); }
+.sidebar-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+.sidebar-menu { list-style: none; padding: 16px 0; }
+.menu-item {
+  padding: 14px 24px; color: var(--text-secondary); cursor: pointer; display: flex;
+  align-items: center; gap: 12px; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent;
+}
+.menu-item:hover { background-color: var(--bg-hover); color: var(--text-primary); }
+.menu-item.active {
+  color: #fff; background: linear-gradient(90deg, rgba(79,70,229,0.25), transparent);
+  border-left-color: var(--accent); font-weight: 600;
+}
+
+.main-content { flex: 1; padding: 32px; max-width: 1400px; }
+
+.player-tab-container { display: none; gap: 10px; margin-bottom: 24px; }
+.player-tab {
+  padding: 10px 24px; background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-secondary);
+  transition: all 0.2s;
+}
+.player-tab.active {
+  background: linear-gradient(135deg, var(--accent), #a855f7); color: white; border-color: transparent;
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+
+.card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; margin-bottom: 24px; }
+.card-title {
+  font-size: 15px; font-weight: 600; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 8px;
+}
+.card-title::before { content: ''; width: 3px; height: 16px; background: var(--accent); border-radius: 2px; }
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 8px; }
+.form-group label { font-size: 12px; color: var(--text-secondary); }
+
+input[type="text"], input[type="number"], select, textarea {
+  background-color: var(--bg-secondary); border: 1px solid var(--border-color);
+  color: var(--text-primary); padding: 12px 14px; border-radius: 6px; font-size: 14px; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+.checkbox-group { display: flex; align-items: center; gap: 8px; cursor: pointer; height: 100%; margin-top: 20px;}
+
+.btn {
+  background-color: var(--accent); color: #fff; border: none; padding: 10px 20px;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { background-color: var(--accent-hover); }
+.btn-danger { background-color: var(--danger); }
+.btn-danger:hover { background-color: #dc2626; }
+.btn-secondary { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
+
+.item-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 10px;
+}
+.item-info { display: flex; flex-direction: column; gap: 4px; }
+.item-name { font-weight: 700; font-size: 15px; text-shadow: 0 0 4px rgba(0,0,0,0.5); }
+.item-meta { font-size: 12px; color: var(--text-secondary); }
+
+.modal-backup {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px);
+  display: none; justify-content: center; align-items: center; z-index: 999; padding: 20px;
+}
+.modal-backup.active { display: flex; }
+.modal-content-bk {
+  background: var(--bg-card); border: 1px solid var(--border-color); padding: 24px;
+  border-radius: 12px; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto;
+}
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; background: var(--success);
+  color: white; padding: 12px 24px; border-radius: 6px; display: none; z-index: 1000; font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+
+/* ==================== 手机端自适应优化 ==================== */
+@media screen and (max-width: 768px) {
+
+  body { overflow-x: hidden; }
+
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    text-align: center;
+  }
+
+  .sidebar-title {
+    font-size: 16px;
+  }
+
+  .sidebar-menu {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .menu-item {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    font-size: 13px;
+  }
+
+  .menu-item.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--accent);
+  }
+
+  .main-content {
+    padding: 12px;
+    width: 100%;
+  }
+
+  .card {
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  .checkbox-group {
+    margin-top: 0;
+    height: auto;
+  }
+
+  .player-tab-container {
+    overflow-x: auto;
+    margin-bottom: 12px;
+  }
+
+  .player-tab {
+    white-space: nowrap;
+  }
+
+  .item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .item-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .item-actions button {
+    flex: 1;
+  }
+
+  .btn {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  #sec_raw .btn {
+    width: 100%;
+  }
+
+  #sec_raw div[style*="display:flex"] {
+    flex-direction: column;
+  }
+
+  .modal-backup {
+    padding: 10px;
+  }
+
+  .modal-content-bk {
+    padding: 16px;
+    max-height: 95vh;
+  }
+
+  .modal-content-bk div[style*="text-align:right"] {
+    flex-direction: column;
+  }
+
+  .modal-content-bk .btn {
+    width: 100%;
+  }
+
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    text-align: center;
+  }
+}
+
+@media screen and (max-width: 380px) {
+  .sidebar-title {
+    font-size: 14px;
+  }
+
+  .menu-item {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .card {
+    padding: 10px;
+  }
+}
+
+
+/* ==================== 主题切换 ==================== */
+body.light-theme {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #e2e8f0;
+  --border-color: #cbd5e1;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+}
+
+body.light-theme .sidebar-title,
+body.light-theme .card-title {
+  color: #0f172a !important;
+}
+
+/* 浅色模式下保留装备/宠物自身品质颜色 */
+body.light-theme .item-name {
+  text-shadow: none;
+}
+
+body.light-theme .item-meta {
+  color: #475569;
+}
+
+body.light-theme input[type="text"],
+body.light-theme input[type="number"],
+body.light-theme select,
+body.light-theme textarea {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+
+body.light-theme .modal-content-bk h3 {
+  color: #0f172a !important;
+}
+
+body.light-theme .modal-content-bk {
+  color: #1e293b;
+}
+
+body.light-theme textarea {
+  background-color: #f8fafc !important;
+}
+
+.theme-toggle {
+  margin: 12px 24px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+@media screen and (max-width:768px){
+  .theme-toggle{
+    margin:8px auto;
+    display:block;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="sidebar-title">再续天庭存档编辑器 1.1版本</div></div><button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">☀️ 浅色模式</button>
+    <ul class="sidebar-menu">
+      <li class="menu-item active" onclick="switchTab('overview')">📊 全局参数</li>
+      <li class="menu-item" onclick="switchTab('basic')">👤 基础信息</li>
+      <li class="menu-item" onclick="switchTab('equip')">⚔️ 装备管理</li>
+      <li class="menu-item" onclick="switchTab('items')">🎒 道具管理</li>
+      <li class="menu-item" onclick="switchTab('fashion')">👗 时装管理</li>
+      <li class="menu-item" onclick="switchTab('pet')">🐉 宠物管理</li>
+      <li class="menu-item" onclick="switchTab('raw')">📁 存档读写</li>
+    </ul>
+  </aside>
+
+  <main class="main-content">
+    <div class="player-tab-container" id="playerTabBox">
+      <div class="player-tab active" id="btn_p1" onclick="switchPlayer(1)">玩家一 (P1)</div>
+      <div class="player-tab" id="btn_p2" style="display:none;" onclick="switchPlayer(2)">玩家二 (P2)</div>
+    </div>
+
+    <div id="sec_overview" class="tab-section">
+      <div class="card">
+        <div class="card-title">全局参数</div>
+        <div class="form-grid">
+          <div class="form-group"><label>玩家人数 (playerNum)</label><input type="number" id="g_playerNum" onchange="syncGlobalXML('playerNum', this.value)"></div>
+          <div class="form-group"><label>补偿礼包计数 (hasgetsorry)</label><input type="number" id="g_hasgetsorry" onchange="syncGlobalXML('hasgetsorry', this.value)"></div>
+          <div class="form-group"><label>神秘补偿计数 (hasgetslsorry)</label><input type="number" id="g_hasgetslsorry" onchange="syncGlobalXML('hasgetslsorry', this.value)"></div>
+          <div class="form-group"><label>当前天书大关 (curBigLevel)</label><input type="number" id="g_curBigLevel" onchange="syncGlobalXML('curBigLevel', this.value)"></div>
+          <div class="form-group"><label>当前劫数小关 (curBigStage)</label><input type="number" id="g_curBigStage" onchange="syncGlobalXML('curBigStage', this.value)"></div>
+          <div class="form-group"><label>最后所在世界 (whichlastworld)</label><input type="number" id="g_whichlastworld" onchange="syncGlobalXML('whichlastworld', this.value)"></div>
+          <div class="form-group"><label>转盘福缘积分 (turntableScore)</label><input type="number" id="g_turntableScore" onchange="syncGlobalXML('turntableScore', this.value)"></div>
+          <div class="form-group"><label>存档天道版本 (version)</label><input type="number" id="g_version" onchange="syncGlobalXML('version', this.value)"></div>
+          <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="g_canplayturntable" onchange="syncGlobalXML('canplayturntable', this.checked)"><label for="g_canplayturntable">开启福缘转盘 (canplayturntable)</label></div></div>
+          <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="g_specialUI" onchange="syncGlobalXML('specialUI', this.checked)"><label for="g_specialUI">特殊天庭UI样式</label></div></div>
+          <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="g_isFirst" onchange="syncGlobalXML('isFirst', this.checked)"><label for="g_isFirst">首次踏入三界 (isFirst)</label></div></div>
+          <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="g_isZx" onchange="syncGlobalXML('isZx', this.checked)"><label for="g_isZx">是否正序规则 (isZx)</label></div></div>
+          <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="g_gm" onchange="syncGlobalXML('gm', this.checked)"><label for="g_gm">全知造物主GM开启</label></div></div>
+          <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="g_hasget" onchange="syncGlobalXML('hasget', this.checked)"><label for="g_hasget">是否已领取奖励</label></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec_basic" class="tab-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">基础信息</div>
+        <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));">
+          <div class="form-group"><label>角色名称 (username)</label><input type="text" id="p_username" onchange="syncPlayerXML('username', this.value)"></div>
+          <div class="form-group"><label>角色 (roleid)</label>
+            <select id="p_roleid" onchange="syncPlayerXML('roleid', this.value)">
+              <option value="1">悟空</option><option value="2">唐僧</option><option value="3">八戒</option><option value="4">沙僧</option><option value="5">白龙</option>
+            </select>
+          </div>
+          <div class="form-group"><label>等级 (curLevel)</label><input type="number" id="p_curLevel" onchange="syncPlayerXML('curLevel', this.value)"></div>
+          <div class="form-group"><label>经验 (curExp)</label><input type="number" id="p_curExp" onchange="syncPlayerXML('curExp', this.value)"></div>
+          <div class="form-group"><label>灵魂 (lhValue)</label><input type="number" id="p_lhValue" onchange="syncPlayerXML('lhValue', this.value)"></div>
+          <div class="form-group"><label>幸运 (luckdata)</label><input type="number" id="p_luckdata" onchange="syncPlayerXML('luckdata', this.value)"></div>
+          <div class="form-group"><label>得分 (myscore)</label><input type="number" id="p_myscore" onchange="syncPlayerXML('myscore', this.value)"></div>
+          <div class="form-group"><label>保存日期 (saveDate)</label><input type="text" id="p_saveDate" onchange="syncPlayerXML('saveDate', this.value)"></div>
+          <div class="form-group"><label>技能上限 (skillLimit)</label><input type="number" id="p_skillLimit" onchange="syncPlayerXML('skillLimit', this.value)"></div>
+          <div class="form-group" style="flex-direction:row; align-items:center; gap:8px;"><label for="p_isshowfashion" style="margin-top:24px;">显示时装 (isshowfashion)</label><input type="checkbox" id="p_isshowfashion" style="margin-top:24px;" onchange="syncPlayerXML('isshowfashion', this.checked?'true':'false')"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec_equip" class="tab-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">当前穿戴 (curSaveString)</div>
+        <div style="margin-bottom:15px;"><button class="btn" onclick="addNewItem('curSaveString')">➕ 添加装备</button></div>
+        <div class="item-list" id="curEquipList"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">装备背包 (bagSaveString)</div>
+        <div style="margin-bottom:15px;"><button class="btn" onclick="addNewItem('bagSaveString')">➕ 添加装备</button></div>
+        <div class="item-list" id="bagEquipList"></div>
+      </div>
+    </div>
+
+    <div id="sec_items" class="tab-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">道具背包 (bagdjSaveString)</div>
+        <div style="margin-bottom:15px;"><button class="btn" onclick="addNewItem('bagdjSaveString')">➕ 添加道具</button></div>
+        <div class="item-list" id="bagdjList"></div>
+      </div>
+    </div>
+
+    <div id="sec_fashion" class="tab-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">时装背包 (bagszSaveString)</div>
+        <div style="margin-bottom:15px;"><button class="btn" onclick="addNewItem('bagszSaveString')">➕ 添加时装</button></div>
+        <div class="item-list" id="bagszList"></div>
+      </div>
+    </div>
+
+    <div id="sec_pet" class="tab-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">宠物仓库 (petSave)</div>
+        <div style="margin-bottom:15px;"><button class="btn" onclick="addNewPet()">➕ 添加宠物</button></div>
+        <div class="item-list" id="petListContainer"></div>
+      </div>
+    </div>
+
+    <div id="sec_raw" class="tab-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">高级密文存档 自动导入/自动混淆导出</div>
+        <div class="form-group full-width">
+          <textarea id="xmlInput" style="height: 280px; font-family: monospace; font-size: 13px; background-color: var(--bg-secondary);" placeholder="在此处粘贴游戏内的【加密串(密文)】，系统将自动进行解密和高内聚穿透还原。当然也可以直接发原生XML明文。"></textarea>
+<div style="margin-top:12px;">
+  <button class="btn btn-secondary" onclick="pasteFromClipboard()">📋 一键导入剪贴板</button>
+</div>
+        </div>
+        <div style="margin-top: 20px; display: flex; gap: 12px;">
+          <button class="btn" style="background-color: var(--success);" onclick="importAndProcessData()">📥 解密并加载存档</button>
+          <button class="btn" onclick="exportAndEncryptData()">📤 保存并加密存档</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backup" id="itemModal">
+  <div class="modal-content-bk">
+    <h3 style="margin-bottom:20px; font-size:16px; color:#fff;" id="itemModalTitle">编辑物品属性</h3>
+    <div class="form-grid" id="itemFormGrid"></div>
+    <div style="margin-top:24px; text-align:right; display:flex; justify-content:flex-end; gap:12px;">
+      <button class="btn btn-secondary" onclick="closeItemModal()">取消</button>
+      <button class="btn" onclick="saveItemFields()">确定修改并保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backup" id="petModal">
+  <div class="modal-content-bk">
+    <h3 style="margin-bottom:20px; font-size:16px; color:#fff;" id="petModalTitle">编辑宠物属性</h3>
+    <div class="form-grid" id="petFormGrid"></div>
+    <div style="margin-top:24px; text-align:right; display:flex; justify-content:flex-end; gap:12px;">
+      <button class="btn btn-secondary" onclick="closePetModal()">取消</button>
+      <button class="btn" onclick="savePetFields()">确定修改并保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastNotice">操作成功！</div>
+
+<script>
+// ==================== 1. 核心状态与底层码映射配置 ====================
+let saveXmlDoc = null; 
+let currentPlayer = 1;
+let currentTab = 'overview';
+let editingContext = { sourceKey: '', index: null };
+let hasPlayer2 = false; 
+
+const itemFieldNames = [
+  "品质代码", "名称", "代码", "类型", "角色", "品质", "颜色代码", "生命", "魔法", "攻击", 
+  "防御", "闪避", "暴击", "回血", "回魔", "金", "木", "水", "火", "土", 
+  "等级", "成长", "数量", "强化", "魔抗", "吸血", "时装日期", "重铸"
+];
+
+const petFieldNames = [
+  "代码", "生命(当前)", "生命(最大)", "魔法(当前)", "魔法(最大)", "等级", "经验", "攻击", "防御", "移速",
+  "魔抗", "暴击", "闪避", "回血", "回蓝", "生命资质", "魔法资质", "攻击资质", "防御资质", "寿命",
+  "宝宝/普通", "悟性", "灵力", "根骨", "是否出战", "技能"
+];
+
+const petNameMap = {
+  "ufo1": "小飞", "ufo2": "裂云", "ufo3": "冲霄",
+  "neat1": "丑牛元帅", "neat2": "丑牛元帅", "neat3": "丑牛元帅", "neat4": "丑牛大元帅",
+  "nian1": "小年兽", "nian2": "年兽", "nian3": "年兽", "nian4": "年兽", "nian5": "大年兽",
+  "horse1": "雪球", "horse2": "雪马", "horse3": "寒野", "horse4": "极寒天马",
+  "mouse1": "子鼠元帅", "mouse2": "子鼠元帅", "mouse3": "子鼠元帅", "mouse4": "子鼠大元帅",
+  "monkey1": "火丸", "monkey2": "灵猴", "monkey3": "火猿", "monkey4": "烈焰金刚",
+  "turtle1": "龟布", "turtle2": "墨玄龟", "turtle3": "玄武将军", "turtle4": "玄武大帝",
+  "dragon1": "龙仔", "dragon2": "绿英龙", "dragon3": "青龙将军", "dragon4": "青龙妖圣",
+  "rabbit1": "月兔", "rabbit2": "疾风兔", "rabbit3": "寒冰玉兔", "rabbit4": "冰霜月神",
+  "tigress1": "虎丸", "tigress2": "白灵虎", "tigress3": "白虎将军", "tigress4": "白虎战神",
+  "phoenix1": "雀蛋", "phoenix2": "炎皇雀", "phoenix3": "朱雀将军", "phoenix4": "朱雀女皇",
+  "roomhorse1": "炎马", "roomhorse2": "炎马", "roomhorse3": "炎马", "roomhorse4": "烈迦",
+  "terribletiger1": "寅虎元帅", "terribletiger2": "寅虎元帅", "terribletiger3": "寅虎元帅", "terribletiger4": "寅虎大元帅"
+};
+
+const ALPHABET = "zYxWvUtSrQpOnMlKjIhGfEdCbAaBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890+/=";
+
+function getPetDisplayName(code) {
+  if (!code) return '未知宠物';
+  return petNameMap[code.trim()] || code.trim();
+}
+
+// ==================== 2. 移植原厂级 完美加解密核心算法 ====================
+function customBase64Encode(u8Array) {
+    let result = ""; let i = 0; const len = u8Array.length;
+    while (i < len) {
+        let b1 = u8Array[i++]; let b2 = i < len ? u8Array[i++] : NaN; let b3 = i < len ? u8Array[i++] : NaN;
+        let enc1 = b1 >> 2; let enc2 = ((b1 & 3) << 4) | (isNaN(b2) ? 0 : b2 >> 4);
+        let enc3 = isNaN(b2) ? 64 : ((b2 & 15) << 2) | (isNaN(b3) ? 0 : b3 >> 6);
+        let enc4 = isNaN(b3) ? 64 : b3 & 63;
+        result += ALPHABET.charAt(enc1) + ALPHABET.charAt(enc2) + ALPHABET.charAt(enc3) + ALPHABET.charAt(enc4);
+    }
+    return result;
+}
+
+function customBase64Decode(str) {
+    str = str.replace(/[\s\r\n]/g, "");
+    let u8Array = []; let i = 0; const phase = {};
+    for (let idx = 0; idx < ALPHABET.length; idx++) { phase[ALPHABET.charAt(idx)] = idx; }
+    while (i < str.length) {
+        let enc1 = phase[str.charAt(i++)]; let enc2 = phase[str.charAt(i++)];
+        let enc3 = i <= str.length ? phase[str.charAt(i++)] : 64; let enc4 = i <= str.length ? phase[str.charAt(i++)] : 64;
+        u8Array.push((enc1 << 2) | (enc2 >> 4));
+        if (enc3 !== 64 && enc3 !== undefined) u8Array.push(((enc2 & 15) << 4) | (enc3 >> 2));
+        if (enc4 !== 64 && enc4 !== undefined) u8Array.push(((enc3 & 3) << 6) | enc4);
+    }
+    return new Uint8Array(u8Array);
+}
+
+function xorEncrypt(u8Array) {
+    let out = new Uint8Array(u8Array.length);
+    for (let i = 0; i < u8Array.length; i++) { out[i] = u8Array[i] ^ 90; }
+    return out;
+}
+
+function writeU29(value) {
+    let bytes = []; value = value & 0x1fffffff;
+    if (value < 0x80) { bytes.push(value); } 
+    else if (value < 0x4000) { bytes.push((value >> 7) | 0x80); bytes.push(value & 0x7F); } 
+    else if (value < 0x200000) { bytes.push((value >> 14) | 0x80); bytes.push((value >> 7) | 0x80); bytes.push(value & 0x7F); } 
+    else { bytes.push((value >> 22) | 0x80); bytes.push((value >> 15) | 0x80); bytes.push((value >> 8) | 0x80); bytes.push(value & 0xFF); }
+    return new Uint8Array(bytes);
+}
+
+function packAMF3ObjectStream(text) {
+    const encoder = new TextEncoder(); const textBytes = encoder.encode(text); const textLen = textBytes.length;
+    const strLenU29 = writeU29((textLen << 1) | 1);
+    const amfPayload = new Uint8Array(1 + strLenU29.length + textBytes.length);
+    amfPayload[0] = 0x06; amfPayload.set(strLenU29, 1); amfPayload.set(textBytes, 1 + strLenU29.length);
+    return amfPayload;
+}
+
+// 核心解密流函数 (修复UTF-8中文映射乱码)
+function coreDecryptStream(inputStr) {
+    inputStr = inputStr.replace(/[\s\r\n]/g, "");
+    if (inputStr.length > 3) {
+        let part = inputStr.substr(1, 2);
+        if (part === "Np") inputStr = inputStr.slice(0, 1) + "Jx" + inputStr.slice(3);
+        if (part === "Nr") inputStr = inputStr.slice(0, 1) + "Jz" + inputStr.slice(3);
+    }
+    let currentBytes = customBase64Decode(inputStr);
+    currentBytes = xorEncrypt(currentBytes);
+    let decompressCount = 0;
+    while (true) {
+        try {
+            let nextDecompressed = pako.inflate(currentBytes);
+            if (!nextDecompressed || nextDecompressed.length === currentBytes.length) break;
+            currentBytes = nextDecompressed; decompressCount++;
+        } catch (zlibErr) { break; }
+    }
+    let decodedStr = new TextDecoder("utf-8").decode(currentBytes);
+    let sIdx = decodedStr.indexOf("<saveXml");
+    if (sIdx === -1) sIdx = decodedStr.indexOf("<?xml");
+    let eIdx = decodedStr.lastIndexOf("</saveXml>");
+    if (sIdx !== -1 && eIdx > sIdx) {
+        return { success: true, xml: decodedStr.slice(sIdx, eIdx + 10), info: `解密成功！(解压 ${decompressCount} 层)` };
+    } else {
+        let cleanStr = decodedStr.replace(/[^\x20-\x7E\u4e00-\u9fa5\s\{\}\[\]\":,<\/>=\?]/g, '').trim();
+        if (cleanStr.includes("<")) return { success: true, xml: cleanStr, info: "解密成功！(数据清洗析出)" };
+    }
+    return { success: false, xml: "", info: "剥离混淆成功，但在底层流中未检索到有效的 <saveXml> 结构！" };
+}
+
+// ==================== 3. 页面交互控制与穿透级 XML 查询 ====================
+function getXmlNodeByName(name, parentNode) {
+  if (!parentNode) {
+    if (!saveXmlDoc) return null;
+    const rootXml = saveXmlDoc.querySelector('saveXml');
+    if (!rootXml) return null;
+    return rootXml.querySelector(` *[name="${name}"]`); // 空格后代选择器，完美无限深度层级穿透
+  }
+  return parentNode.querySelector(` *[name="${name}"]`);
+}
+
+function getPlayerObjNode(pNum) {
+  if (!saveXmlDoc) return null;
+  const rootXml = saveXmlDoc.querySelector('saveXml');
+  if (!rootXml) return null;
+  return rootXml.querySelector(` *[name="player${pNum}_obj"]`);
+}
+
+function syncGlobalXML(field, value) {
+  const node = getXmlNodeByName(field);
+  if (node) {
+    if (node.getAttribute('type') === 'Boolean') {
+      node.textContent = (value === true || value === 'true') ? 'true' : 'false';
+    } else {
+      node.textContent = value;
+    }
+  }
+}
+
+function syncPlayerXML(field, value) {
+  const pNode = getPlayerObjNode(currentPlayer);
+  if (!pNode) return;
+  const node = getXmlNodeByName(field, pNode);
+  if (node) node.textContent = value;
+}
+
+function switchTab(tabId) {
+  currentTab = tabId;
+  document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  
+  document.querySelectorAll('.tab-section').forEach(el => el.style.display = 'none');
+  const sectionEl = document.getElementById('sec_' + tabId);
+  if (sectionEl) sectionEl.style.display = 'block';
+  
+  const tabBox = document.getElementById('playerTabBox');
+  if (tabId === 'raw' || tabId === 'overview') {
+    tabBox.style.display = 'none';
+  } else {
+    tabBox.style.display = hasPlayer2 ? 'flex' : 'none';
+  }
+  renderCurrentSection();
+}
+
+function switchPlayer(pNum) {
+  currentPlayer = pNum;
+  document.getElementById('btn_p1').classList.toggle('active', pNum === 1);
+  document.getElementById('btn_p2').classList.toggle('active', pNum === 2);
+  renderCurrentSection();
+}
+
+function showToast(text, isError = false) {
+  const t = document.getElementById('toastNotice');
+  t.textContent = text; 
+  t.style.backgroundColor = isError ? 'var(--danger)' : 'var(--success)';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+function renderCurrentSection() {
+  if (!saveXmlDoc) return;
+
+  if (currentTab === 'overview') {
+    const fields = ['playerNum', 'hasgetsorry', 'hasgetslsorry', 'curBigLevel', 'curBigStage', 'whichlastworld', 'turntableScore', 'version', 'canplayturntable', 'specialUI', 'isFirst', 'isZx', 'gm', 'hasget'];
+    fields.forEach(f => {
+      const el = document.getElementById('g_' + f);
+      const node = getXmlNodeByName(f);
+      if (!el || !node) return;
+      if (el.type === 'checkbox') el.checked = node.textContent.trim() === 'true';
+      else el.value = node.textContent.trim();
+    });
+  } else if (currentTab === 'basic') {
+    const pNode = getPlayerObjNode(currentPlayer);
+    if (!pNode) return;
+    const fields = ['username', 'roleid', 'curLevel', 'curExp', 'lhValue', 'luckdata', 'myscore', 'saveDate', 'skillLimit', 'isshowfashion'];
+    fields.forEach(f => {
+      const el = document.getElementById('p_' + f);
+      const node = getXmlNodeByName(f, pNode);
+      if (!el || !node) return;
+      if (f === 'isshowfashion') el.checked = node.textContent.trim() === 'true';
+      else el.value = node.textContent.trim();
+    });
+  } else if (currentTab === 'equip') {
+    renderItemsList('curSaveString', 'curEquipList');
+    renderItemsList('bagSaveString', 'bagEquipList');
+  } else if (currentTab === 'items') {
+    renderItemsList('bagdjSaveString', 'bagdjList');
+  } else if (currentTab === 'fashion') {
+    renderItemsList('bagszSaveString', 'bagszList');
+  } else if (currentTab === 'pet') {
+    renderPetList();
+  }
+}
+
+// ==================== 4. 序列化物品字符串处理与呈现机制 ====================
+function getPlayerStringVal(key) {
+  const pNode = getPlayerObjNode(currentPlayer);
+  if (!pNode) return '';
+  const node = getXmlNodeByName(key, pNode);
+  return node ? node.textContent : '';
+}
+
+function setPlayerStringVal(key, val) {
+  const pNode = getPlayerObjNode(currentPlayer);
+  if (!pNode) return;
+  const node = getXmlNodeByName(key, pNode);
+  if (node) node.textContent = val;
+}
+
+function parseItems(str) {
+  if (!str) return [];
+  return str.split('}').map(s => s.trim()).filter(s => s.length > 0).map(s => s.split('|'));
+}
+
+function rebuildItemString(arrList) {
+  if (!arrList.length) return '';
+  return arrList.map(arr => arr.join('|')).join('}') + '}';
+}
+
+function convertGameColor(colorStr) {
+  if (!colorStr) return '#e2e8f0'; 
+  let cleanColor = colorStr.trim();
+  if (cleanColor.startsWith('0x') || cleanColor.startsWith('0X')) return '#' + cleanColor.substring(2);
+  return cleanColor; 
+}
+
+function renderItemsList(sourceKey, targetContainerId) {
+  const container = document.getElementById(targetContainerId);
+  const items = parseItems(getPlayerStringVal(sourceKey));
+  container.innerHTML = '';
+  if (!items.length) {
+    container.innerHTML = '<div style="color:var(--text-muted); padding:12px; font-size:13px;">列表为空</div>';
+    return;
+  }
+  items.forEach((item, index) => {
+    const row = document.createElement('div'); row.className = 'item-row';
+    const name = item[1] || '未命名'; const quality = item[5] || '普通'; const level = item[20] ? (' Lv.' + item[20]) : '';
+    const displayColor = convertGameColor(item[6]);
+    row.innerHTML = `
+      <div class="item-info">
+        <div class="item-name" style="color: ${displayColor};">${name} <span style="font-size:12px; margin-left:6px; opacity: 0.85;">[${quality}${level}]</span></div>
+        <div class="item-meta">代码: ${item[2]||'无'} | 攻击: ${item[9]||0} | 防御: ${item[10]||0} | 数量: ${item[22]||1}</div>
+      </div>
+      <div class="item-actions">
+        <button class="btn" onclick="openItemModal('${sourceKey}', ${index})">修改</button>
+        <button class="btn btn-danger" onclick="deleteItem('${sourceKey}', ${index})">删除</button>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function openItemModal(sourceKey, index) {
+  editingContext.sourceKey = sourceKey; editingContext.index = index;
+  const items = parseItems(getPlayerStringVal(sourceKey)); const item = items[index];
+  document.getElementById('itemModalTitle').textContent = `编辑位置 ${index}: ${item[1] || '未命名'}`;
+  const grid = document.getElementById('itemFormGrid'); grid.innerHTML = '';
+  for (let i = 0; i < 28; i++) {
+    const val = item[i] !== undefined ? item[i] : '';
+    grid.innerHTML += `<div class="form-group"><label>${itemFieldNames[i]} (位置 ${i})</label><input type="text" id="m_field_${i}" value="${val}"></div>`;
+  }
+  document.getElementById('itemModal').classList.add('active');
+}
+function closeItemModal() { document.getElementById('itemModal').classList.remove('active'); }
+
+function saveItemFields() {
+  const { sourceKey, index } = editingContext; const items = parseItems(getPlayerStringVal(sourceKey));
+  for (let i = 0; i < 28; i++) { items[index][i] = document.getElementById(`m_field_${i}`).value; }
+  setPlayerStringVal(sourceKey, rebuildItemString(items)); closeItemModal(); renderCurrentSection(); showToast('保存成功！');
+}
+
+function addNewItem(sourceKey) {
+  const items = parseItems(getPlayerStringVal(sourceKey)); const newTemplate = Array(28).fill('0');
+  newTemplate[0] = "1"; newTemplate[1] = "新物品"; newTemplate[2] = "new_item"; newTemplate[5] = "普通"; newTemplate[6] = "0xFFFFFF"; newTemplate[22] = "1";
+  items.push(newTemplate); setPlayerStringVal(sourceKey, rebuildItemString(items)); renderCurrentSection(); showToast('添加成功！');
+}
+
+function deleteItem(sourceKey, index) {
+  if (!confirm('确定删除吗？')) return;
+  const items = parseItems(getPlayerStringVal(sourceKey)); items.splice(index, 1);
+  setPlayerStringVal(sourceKey, rebuildItemString(items)); renderCurrentSection(); showToast('已删除');
+}
+
+function renderPetList() {
+  const container = document.getElementById('petListContainer'); const pets = parseItems(getPlayerStringVal('petSave'));
+  container.innerHTML = '';
+  if (!pets.length) { container.innerHTML = '<div style="color:var(--text-muted); padding:12px; font-size:13px;">列表为空</div>'; return; }
+  pets.forEach((pet, index) => {
+    const row = document.createElement('div'); row.className = 'item-row'; const petChineseName = getPetDisplayName(pet[0]);
+    row.innerHTML = `
+      <div class="item-info">
+        <div class="item-name" style="color: #f59e0b;">${petChineseName} <span style="font-size:12px; color:var(--accent);">[等级:${pet[5]||1}]</span></div>
+        <div class="item-meta">代码: ${pet[0]||'无'} | 生命: ${pet[1]}/${pet[2]} | 攻击: ${pet[7]} | 防御: ${pet[8]} | 出战: ${pet[24] === '1' ? '是' : '否'}</div>
+      </div>
+      <div class="item-actions">
+        <button class="btn" onclick="openPetModal(${index})">修改</button>
+        <button class="btn btn-danger" onclick="deletePet(${index})">删除</button>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function openPetModal(index) {
+  editingContext.index = index; const pets = parseItems(getPlayerStringVal('petSave')); const pet = pets[index];
+  document.getElementById('petModalTitle').textContent = `编辑宠物 ${index}: ${getPetDisplayName(pet[0])}`;
+  const grid = document.getElementById('petFormGrid'); grid.innerHTML = '';
+  for (let i = 0; i < 26; i++) {
+    const val = pet[i] !== undefined ? pet[i] : '';
+    grid.innerHTML += `<div class="form-group"><label>${petFieldNames[i]} (位置 ${i})</label><input type="text" id="m_pet_${i}" value="${val}"></div>`;
+  }
+  document.getElementById('petModal').classList.add('active');
+}
+function closePetModal() { document.getElementById('petModal').classList.remove('active'); }
+
+function savePetFields() {
+  const index = editingContext.index; const pets = parseItems(getPlayerStringVal('petSave'));
+  for (let i = 0; i < 26; i++) { pets[index][i] = document.getElementById(`m_pet_${i}`).value; }
+  setPlayerStringVal('petSave', rebuildItemString(pets)); closePetModal(); renderCurrentSection(); showToast('宠物保存成功！');
+}
+
+function addNewPet() {
+  const pets = parseItems(getPlayerStringVal('petSave')); const newPet = Array(26).fill('0');
+  newPet[0] = "monkey4"; newPet[1] = "500"; newPet[2] = "500"; newPet[3] = "200"; newPet[4] = "200"; newPet[5] = "1";
+  newPet[15] = "1000"; newPet[16] = "1000"; newPet[17] = "1000"; newPet[18] = "1000"; newPet[19] = "100";
+  pets.push(newPet); setPlayerStringVal('petSave', rebuildItemString(pets)); renderPetList(); showToast('添加成功！');
+}
+
+function deletePet(index) {
+  if (!confirm('确定删除该宠物吗？')) return;
+  const pets = parseItems(getPlayerStringVal('petSave')); pets.splice(index, 1);
+  setPlayerStringVal('petSave', rebuildItemString(pets)); renderPetList(); showToast('已删除');
+}
+
+// ==================== 5. 统一数据交互：自动化导入(带解密)与导出(带加密) ====================
+
+async function pasteFromClipboard() {
+  const ta = document.getElementById('xmlInput');
+
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      throw new Error('当前浏览器不支持剪贴板读取');
+    }
+
+    const text = await navigator.clipboard.readText();
+
+    if (!text || !text.trim()) {
+      showToast('剪贴板为空！', true);
+      return;
+    }
+
+    ta.value = text.trim();
+    showToast('剪贴板导入成功！');
+
+  } catch (err) {
+    // 手机浏览器权限失败时给出提示
+    alert(
+      '无法读取剪贴板。\n\n' +
+      '请允许浏览器访问剪贴板权限，或者手动长按粘贴。\n\n原因：' + err.message
+    );
+  }
+}
+
+function importAndProcessData() {
+  let inputStr = document.getElementById('xmlInput').value.trim();
+  if (!inputStr) { alert('请输入有效的存档串或XML！'); return; }
+  
+  let targetXml = inputStr;
+  
+  // 识别机制：如果是密文数据(一般不含 '<' 标记且长度较长)
+  if (!inputStr.startsWith('<') && !inputStr.startsWith('<?xml')) {
+      const res = coreDecryptStream(inputStr);
+      if (!res.success) {
+          alert(`密文解密失败：${res.info}`);
+          return;
+      }
+      targetXml = res.xml;
+      showToast(res.info);
+  }
+  
+  // 开始实例化 DOM 树
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(targetXml, 'text/xml');
+  const saveXml = doc.querySelector('saveXml');
+  if (!saveXml) { alert('解析结构致命错误：未能提取到有效的 <saveXml> 根标签！'); return; }
+  
+  saveXmlDoc = doc;
+  const p2Node = getXmlNodeByName('player2_obj');
+  hasPlayer2 = !!p2Node;
+  
+  document.getElementById('btn_p2').style.display = hasPlayer2 ? 'block' : 'none';
+  if (!hasPlayer2) currentPlayer = 1;
+  
+  renderCurrentSection();
+  showToast('存档数据加载、解密穿透完全成功！');
+}
+
+function exportAndEncryptData() {
+  if (!saveXmlDoc) { alert('当前未加载有效数据树，无法打包导出！'); return; }
+  
+  // 1. 生成明文 XML
+  const serializer = new XMLSerializer();
+  let xmlText = serializer.serializeToString(saveXmlDoc);
+  // 清洗可能产生的多余换行
+  xmlText = xmlText.replace(/></g, '>\n<');
+  
+  try {
+      // 2. 将明文注入 AMF3 文本对象打包程序
+      let bytes = packAMF3ObjectStream(xmlText);
+      
+      // 3. 严格匹配易语言层级的高聚合随机压缩循环 (1~6次)
+      let loops = Math.floor(Math.random() * 6) + 1;
+      for (let i = 0; i < loops; i++) {
+          bytes = pako.deflate(bytes);
+      }
+      
+      // 4. 固定异或 90 密钥加密
+      bytes = xorEncrypt(bytes);
+      
+      // 5. 进行混淆 Base64 编码
+      let cipherText = customBase64Encode(bytes);
+      
+      // 6. 还原特定的混淆字头机制
+      if (cipherText.substr(1, 2) === "Jx") {
+          cipherText = cipherText.slice(0, 1) + "Np" + cipherText.slice(3);
+      } else if (cipherText.substr(1, 2) === "Jz") {
+          cipherText = cipherText.slice(0, 1) + "Nr" + cipherText.slice(3);
+      }
+      
+      // 7. 回写并复制到剪贴板
+      const ta = document.getElementById('xmlInput');
+      ta.value = cipherText;
+      ta.select();
+      document.execCommand('copy');
+      showToast(`加密打包成功！(深度：${loops}层压缩) 已自动复制到剪贴板。`);
+  } catch (err) {
+      alert('加密缝合阶段崩溃: ' + err.message);
+  }
+}
+
+
+// ==================== 主题切换 ====================
+function toggleTheme() {
+  document.body.classList.toggle('light-theme');
+  const light = document.body.classList.contains('light-theme');
+  document.getElementById('themeBtn').textContent = light ? '🌙 深色模式' : '☀️ 浅色模式';
+  localStorage.setItem('themeMode', light ? 'light' : 'dark');
+}
+
+function loadTheme() {
+  if (localStorage.getItem('themeMode') === 'light') {
+    document.body.classList.add('light-theme');
+    const btn = document.getElementById('themeBtn');
+    if (btn) btn.textContent = '🌙 深色模式';
+  }
+}
+
+window.onload = function() {
+  loadTheme();
+  const defaultXml = `<saveXml><s name="playerNum">1</s><s name="player1_obj"><s name="username">新玩家</s><s name="roleid">1</s><s name="petSave"></s><s name="curSaveString"></s><s name="bagSaveString"></s><s name="bagdjSaveString"></s><s name="bagszSaveString"></s></s></saveXml>`;
+  saveXmlDoc = (new DOMParser()).parseFromString(defaultXml, 'text/xml');
+  renderCurrentSection();
+};
+</script>
+</body>
+</html>
